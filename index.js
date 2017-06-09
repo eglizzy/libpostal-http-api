@@ -16,27 +16,18 @@ function server() {
     }
 
     const app = route.define([
-
         route.get("/health", {up: true}),
-        route.post("/expand", ["body"], body => {
-            const expansions = postal.expand.expand_address(body.address)
-            return {success: true, expansions,}
-        }),
-        route.post("/parse", ["body"], body => {
-            const parsed = postal.parser.parse_address(body.address)
-            return {success: true, parsed,}
-        }),
-
+        route.post("/expand", ["body"], ({address}) => callableDirectives['expand'](address)),
+        route.post("/parse", ["body"], ({address}) => callableDirectives['parse'](address)),
         route.post("/batch", ["body"], body => ({
                 addresses: body.addresses.map(({address, directives}) =>
                     directives.reduce(
-                        (acc, directive) => Object.assign(acc, callableDirectives[directive](address)),
+                        (accResults, directive) => Object.assign(accResults, callableDirectives[directive](address)),
                         {address}
                     )
                 )
             })
         ),
-
     ])
 
     const middleware = [
@@ -52,7 +43,7 @@ function server() {
 
 
 if (cluster.isMaster) {
-    for (var i = 0; i < numCPUs; i++) {
+    for (let i = 0; i < numCPUs; i++) {
         cluster.fork();
     }
 } else {
