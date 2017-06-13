@@ -1,3 +1,5 @@
+require('dotenv').config()
+const argsParser = require('yargs-parser')
 const spirit = require("spirit")
 const route = require("spirit-router")
 const express = require("spirit-express")
@@ -7,9 +9,11 @@ const bodyParser = require("body-parser")
 const postal = require("node-postal")
 const cluster = require("cluster")
 
-const numCPUs = 2
+const runTimeArgs = argsParser(process.argv.slice(2))
+const numCPUs = parseInt(process.env.CPUS) || 0
+const apiPort = parseInt(runTimeArgs.API_PORT) || parseInt(process.env.API_PORT)
 
-function server() {
+function server(port) {
     const callableDirectives = {
         expand: address => ({expansions: postal.expand.expand_address(address)}),
         parse: address => ({parse: postal.parser.parse_address(address)}),
@@ -25,27 +29,31 @@ function server() {
                         (accResults, directive) => Object.assign(accResults, callableDirectives[directive](address)),
                         {address}
                     )
-                )
+                ),
             })
         ),
     ])
 
     const middleware = [
         express(bodyParser.json()),
-        express(bodyParser.urlencoded({extended: true}))
+        express(bodyParser.urlencoded({extended: true})),
     ]
 
-    const site = spirit.node.adapter(app, middleware)
+    const api = spirit.node.adapter(app, middleware)
 
-    const server = http.createServer(site)
-    server.listen(3009)
+    const server = http.createServer(api)
+    server.listen(port)
 }
 
 
-if (cluster.isMaster) {
-    for (let i = 0; i < numCPUs; i++) {
-        cluster.fork();
+if (numCPUs) {
+    if (cluster.isMaster) {
+        for (let i = 0; i < numCPUs; i++) {
+            cluster.fork();
+        }
+    } else {
+        server(apiPort)
     }
 } else {
-    server()
+    server(apiPort)
 }
