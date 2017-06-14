@@ -9,10 +9,8 @@
   "dependencies": {
     "body-parser": "^1.17.2",
     "dotenv": "^4.0.0",
+    "express": "^4.15.3",
     "node-postal": "^1.0.0",
-    "spirit": "^0.6.0",
-    "spirit-express": "^0.2.2",
-    "spirit-router": "^0.5.0",
     "yargs-parser": "^7.0.0"
   }
 }

@@ -1,8 +1,6 @@
 require('dotenv').config()
 const argsParser = require('yargs-parser')
-const spirit = require("spirit")
-const route = require("spirit-router")
-const express = require("spirit-express")
+const express = require("express")
 
 const http = require("http")
 const bodyParser = require("body-parser")
@@ -10,50 +8,73 @@ const postal = require("node-postal")
 const cluster = require("cluster")
 
 const runTimeArgs = argsParser(process.argv.slice(2))
-const numCPUs = parseInt(process.env.CPUS) || 0
 const apiPort = parseInt(runTimeArgs.API_PORT) || parseInt(process.env.API_PORT)
 
+server(normalizePort(apiPort))
 function server(port) {
     const callableDirectives = {
         expand: address => ({expansions: postal.expand.expand_address(address)}),
         parse: address => ({parse: postal.parser.parse_address(address)}),
     }
 
-    const app = route.define([
-        route.get("/health", {up: true}),
-        route.post("/expand", ["body"], ({address}) => callableDirectives['expand'](address)),
-        route.post("/parse", ["body"], ({address}) => callableDirectives['parse'](address)),
-        route.post("/batch", ["body"], body => ({
-                addresses: body.addresses.map(({address, directives}) =>
-                    directives.reduce(
-                        (accResults, directive) => Object.assign(accResults, callableDirectives[directive](address)),
-                        {address}
-                    )
-                ),
-            })
-        ),
-    ])
+    const app = express()
+    const router = express.Router()
 
-    const middleware = [
-        express(bodyParser.json()),
-        express(bodyParser.urlencoded({extended: true})),
-    ]
+    router.get("/health", (req, res) => res.json({up: true}))
+    router.post("/expand", (req, res) => res.json(callableDirectives['expand'](req.body.address)))
+    router.post("/parse", (req, res) => res.json(callableDirectives['parse'](req.body.address)))
+    router.post("/batch", (req, res) => res.json({
+            addresses: req.body.addresses.map(({address, directives}) =>
+                directives.reduce(
+                    (accResults, directive) => Object.assign(accResults, callableDirectives[directive](address)),
+                    {address}
+                )
+            ),
+        })
+    )
 
-    const api = spirit.node.adapter(app, middleware)
+    app.use(bodyParser.json())
+    app.use(bodyParser.urlencoded({extended: false}))
 
-    const server = http.createServer(api)
+    app.use('/', router)
+    app.set('port', port)
+
+    const server = http.createServer(app)
     server.listen(port)
+    server.on('error', onError)
+    server.on('listening', onListening(server))
 }
 
 
-if (numCPUs) {
-    if (cluster.isMaster) {
-        for (let i = 0; i < numCPUs; i++) {
-            cluster.fork();
-        }
-    } else {
-        server(apiPort)
+function normalizePort(val) {
+    let port = (typeof val === 'string') ? parseInt(val, 10) : val
+    if (isNaN(port)) return val
+    else if (port >= 0) return port
+    else return false
+}
+
+function onError(error) {
+    if (error.syscall !== 'listen') throw error
+    let bind = (typeof port === 'string') ? 'Pipe ' + port : 'Port ' + port
+    switch (error.code) {
+        case 'EACCES':
+            console.error(`${bind} requires elevated privileges`)
+            process.exit(1)
+            break
+        case 'EADDRINUSE':
+            console.error(`${bind} is already in use`)
+            process.exit(1)
+            break
+        default:
+            throw error
     }
-} else {
-    server(apiPort)
+
+}
+
+function onListening(server) {
+    return () => {
+        let addr = server.address()
+        let bind = (typeof addr === 'string') ? `pipe ${addr}` : `port ${addr.port}`
+        console.log(`Listening on ${bind}`)
+    }
 }
