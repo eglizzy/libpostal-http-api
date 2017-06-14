@@ -55,7 +55,7 @@ function normalizePort(val) {
 
 function onError(error) {
     if (error.syscall !== 'listen') throw error
-    let bind = (typeof port === 'string') ? 'Pipe ' + port : 'Port ' + port
+    let bind = (typeof apiPort === 'string') ? 'Pipe ' + apiPort : 'Port ' + apiPort
     switch (error.code) {
         case 'EACCES':
             console.error(`${bind} requires elevated privileges`)
