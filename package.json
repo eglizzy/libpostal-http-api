@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
+  "scripts": {
+    "start": "node index.js --API_PORT=$API_PORT"
+  },
   "dependencies": {
     "body-parser": "^1.17.2",
     "dotenv": "^4.0.0",
